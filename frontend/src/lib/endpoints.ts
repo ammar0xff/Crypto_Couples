@@ -1,7 +1,14 @@
 import type { MediaType, OperationKind, OperationStatus } from "../types";
 
+const MEDIA_ROUTE: Record<MediaType, string> = {
+  image: "images",
+  audio: "audio",
+  video: "video",
+  file: "files",
+};
+
 export function workflowPath(media: MediaType, kind: OperationKind): string {
-  return `/api/${media}/${kind}`;
+  return `/api/${MEDIA_ROUTE[media]}/${kind}`;
 }
 
 export function downloadAllUrl(opId: string): string {
