@@ -7,3 +7,5 @@ __pycache__/
 .venv/
 backend/data/
 node_modules/
+# Build output
+dist/
