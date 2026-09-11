@@ -39,7 +39,9 @@ class Settings:
     temp_directory: Path = Path(
         os.environ.get("TEMP_DIRECTORY", "backend/data/ops")
     ).resolve()
-    history_path: Path = Path("backend/data/history.db").resolve()
+    history_path: Path = Path(
+        os.environ.get("HISTORY_PATH", "backend/data/history.db")
+    ).resolve()
     ffmpeg_path: str | None = (
         os.environ.get("FFMPEG_PATH", "").strip() or None
     )

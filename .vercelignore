@@ -1,0 +1,12 @@
+.git
+**/node_modules
+**/__pycache__
+**/*.pyc
+.pytest_cache
+backend/data
+tests
+backend/tests
+frontend/src
+docs/PLAN.md
+.env
+.venv
