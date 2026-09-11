@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import { SplitSquareVertical } from "lucide-react";
 
@@ -7,12 +9,51 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../co
 import { Dropzone } from "../components/ui/dropzone";
 import { Button } from "../components/ui/button";
 import { AppShell } from "../components/layout/app-shell";
+import { SplitOptionsPanel } from "../components/options-panel";
+import { RecipeCard } from "../components/recipe-card";
+import { useSubmitWorkflow } from "../hooks/use-ops";
+import { ApiError } from "../lib/api";
+import { optionsMeta, toSplitOptions, type OptionValues } from "../lib/options";
 import { MEDIA_TYPES, type MediaType } from "../types";
 
 export function SplitPage() {
   const navigate = useNavigate();
   const [media, setMedia] = useState<MediaType>("image");
   const [files, setFiles] = useState<File[]>([]);
+
+  const meta = useMemo(() => optionsMeta(media, "split"), [media]);
+  const form = useForm<OptionValues>({
+    resolver: zodResolver(meta.schema) as unknown as Resolver<OptionValues>,
+    defaultValues: meta.defaults as OptionValues,
+    mode: "onSubmit",
+  });
+
+  useEffect(() => {
+    form.reset(meta.defaults as OptionValues);
+  }, [form, media]);
+
+  const submit = useSubmitWorkflow(media, "split");
+
+  const ready = files.length > 0 && (media !== "image" || files.length === 1);
+
+  const onValid = useCallback(
+    (values: OptionValues) => {
+      submit.mutate(
+        { files, options: toSplitOptions(values) },
+        {
+          onSuccess: () => navigate("/operations"),
+        },
+      );
+    },
+    [submit, files, navigate],
+  );
+
+  const watched = form.watch();
+  const errorMessage = submit.error
+    ? submit.error instanceof ApiError
+      ? submit.error.message
+      : "The backend rejected the request."
+    : null;
 
   return (
     <AppShell>
@@ -41,8 +82,8 @@ export function SplitPage() {
             <CardHeader>
               <CardTitle>Source</CardTitle>
               <CardDescription>
-                The file holding the secret. Dropped files stay local and are
-                processed in memory.
+                The file holding the secret. Uploads stay on this machine only
+                for the life of the operation.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -50,37 +91,88 @@ export function SplitPage() {
                 files={files}
                 onFilesChange={setFiles}
                 multiple={media === "file"}
-                hint={media === "file" ? "Multiple files become one share set" : "One image"}
+                hint={
+                  media === "file"
+                    ? "Multiple files become one share set"
+                    : "Exactly one source file"
+                }
                 aria-label="Source files"
               />
             </CardContent>
           </Card>
 
-          <div className="flex flex-col gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recipe</CardTitle>
-                <CardDescription>
-                  Options and engine parameters, confirmed before processing.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <p className="text-text-muted">Engine controls arrive in P12.</p>
-                <p className="text-text-faint">Method, share count, and threshold are chosen here.</p>
-              </CardContent>
-            </Card>
-
-            <Button
-              size="lg"
-              className="w-full"
-              onClick={() => navigate("/operations")}
+          <FormProvider {...form}>
+            <form
+              className="flex flex-col gap-6"
+              onSubmit={form.handleSubmit(onValid)}
+              noValidate
             >
-              <SplitSquareVertical aria-hidden />
-              Continue to processing
-            </Button>
-          </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Engine controls</CardTitle>
+                  <CardDescription>
+                    Algorithm parameters, confirmed before processing.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <SplitOptionsPanel media={media} />
+                </CardContent>
+              </Card>
+
+              <RecipeCard
+                media={media}
+                kind="split"
+                rows={recipeRows(media, watched)}
+                note="For demonstration only. The CSPRNG shuffle is not for real secrets."
+              />
+
+              {errorMessage && (
+                <p role="alert" className="text-sm text-danger">
+                  {errorMessage}
+                </p>
+              )}
+
+              <Button size="lg" type="submit" disabled={!ready || submit.isPending}>
+                <SplitSquareVertical aria-hidden />
+                {submit.isPending ? "Starting" : "Split into shares"}
+              </Button>
+              {!ready && (
+                <p className="-mt-4 text-xs text-text-faint">
+                  {media === "image" ? "Add one image to continue." : "Add files to continue."}
+                </p>
+              )}
+            </form>
+          </FormProvider>
         </div>
       </div>
     </AppShell>
   );
+}
+
+function recipeRows(media: MediaType, values: OptionValues) {
+  const rows: { label: string; value: React.ReactNode }[] = [
+    { label: "Method", value: String(values.method ?? "") },
+    { label: "Shares", value: String(values.shares ?? "") },
+  ];
+  const method = String(values.method ?? "");
+  const threshold = values.threshold;
+  if (media === "image" || media === "video") {
+    rows.push({
+      label: media === "image" ? "Threshold" : "Frame threshold",
+      value: String(threshold ?? ""),
+    });
+  }
+  if (media === "audio" || media === "file") {
+    rows.push({
+      label: "Threshold",
+      value: threshold == null || threshold === "" ? "all" : String(threshold),
+    });
+  }
+  if (media === "audio" && method === "shamir") {
+    rows.push({ label: "k-of-n", value: `${threshold == null || threshold === "" ? values.shares : threshold}/${values.shares}` });
+  }
+  if (values.seed !== null && values.seed !== undefined) {
+    rows.push({ label: "Seed", value: String(values.seed) });
+  }
+  return rows;
 }

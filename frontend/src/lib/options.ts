@@ -1,6 +1,15 @@
 import { z } from "zod";
-import type { MediaType } from "../types";
+import type { MediaType, OperationKind } from "../types";
 import { optionDefaults } from "./endpoints";
+
+export type OptionValues = Record<string, unknown>;
+
+export function optionsMeta(media: MediaType, kind: OperationKind) {
+  return {
+    schema: kind === "split" ? splitSchemas[media] : revealSchemas[media],
+    defaults: kind === "split" ? splitDefaults(media) : revealDefaults(media),
+  };
+}
 
 const seedField = z.preprocess(
   (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
@@ -98,14 +107,14 @@ export const videoRevealSchema = z.object({
   no_audio: z.boolean(),
 });
 
-export const splitSchemas: Record<MediaType, z.ZodType> = {
+export const splitSchemas: Record<MediaType, z.ZodTypeAny> = {
   image: imageSplitSchema,
   audio: audioSplitSchema,
   video: videoSplitSchema,
   file: fileSplitSchema,
 };
 
-export const revealSchemas: Record<MediaType, z.ZodType> = {
+export const revealSchemas: Record<MediaType, z.ZodTypeAny> = {
   image: imageRevealSchema,
   audio: audioRevealSchema,
   video: videoRevealSchema,
@@ -152,20 +161,28 @@ export function toSplitOptions(
   values: Record<string, unknown>,
 ): Record<string, unknown> {
   const opts: Record<string, unknown> = { ...values };
-  delete opts.seed;
-  if (opts.seed !== undefined && values.seed != null) {
+
+  if (
+    values.seed !== null &&
+    values.seed !== undefined &&
+    values.seed !== ""
+  ) {
     opts.seed = Number(values.seed);
+  } else {
+    delete opts.seed;
   }
+
   if ((opts.method as string) === "shamir") {
     const shareCount = Number(opts.shares);
     const threshold = opts.threshold;
-    opts.threshold = threshold === null || threshold === undefined
-      ? shareCount
-      : Number(threshold);
+    opts.threshold =
+      threshold === null || threshold === undefined
+        ? shareCount
+        : Number(threshold);
   } else if ("threshold" in opts) {
-    opts.threshold = undefined;
     delete opts.threshold;
   }
+
   if ("fps" in opts && (opts.fps === null || opts.fps === "")) {
     delete opts.fps;
   }

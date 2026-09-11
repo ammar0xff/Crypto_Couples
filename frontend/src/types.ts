@@ -97,7 +97,7 @@ export interface ProgressEvent {
   type: "progress" | "completed" | "cancelled";
   progress: number;
   message: string;
-  error: ErrorPayload | null;
+  error?: ErrorPayload | null;
 }
 
 export interface ErrorEvent {

@@ -40,7 +40,9 @@ export const useOperationsStore = create<OperationsState>((set) => ({
         status: statusForEvent(event, base),
         progress: event.progress ?? base?.progress ?? 0,
         message:
-          event.message ?? event.error?.message ?? base?.message ?? "",
+          event.type === "error"
+            ? event.error?.message ?? event.message ?? base?.message ?? ""
+            : event.message ?? event.error?.message ?? base?.message ?? "",
         created_at: base?.created_at ?? new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
