@@ -73,8 +73,9 @@ def test_spa_document_gets_spa_csp_not_api_csp(client):
     assert "script-src 'self'" in csp, "SPA documentation lacks script-src 'self'"
 
     api = client.get("/api/health")
-    assert "default-src 'none'" in api.headers["Content-Security-Policy"],
-    "API responses must keep the strict lockdown"
+    assert "default-src 'none'" in api.headers["Content-Security-Policy"], (
+        "API responses must keep the strict lockdown"
+    )
 
 
 def test_security_headers(client):
