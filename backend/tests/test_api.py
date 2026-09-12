@@ -59,6 +59,24 @@ def test_csp_header_present(client):
     assert "Content-Security-Policy" in r.headers
 
 
+def test_spa_document_gets_spa_csp_not_api_csp(client):
+    """Regression: the SPA document must NOT receive the strict API CSP
+    (default-src 'none', which blocks every script/style/image/manifest/
+    service-worker -> white page). Get a real in-process response so we can
+    inspect the actual header value, not just its presence."""
+    _DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+    if not (_DIST / "index.html").is_file():
+        pytest.skip("SPA dist not built in this checkout")
+    r = client.get("/")
+    csp = r.headers["Content-Security-Policy"]
+    assert "default-src 'none'" not in csp, "SPA document got the strict API CSP"
+    assert "script-src 'self'" in csp, "SPA documentation lacks script-src 'self'"
+
+    api = client.get("/api/health")
+    assert "default-src 'none'" in api.headers["Content-Security-Policy"],
+    "API responses must keep the strict lockdown"
+
+
 def test_security_headers(client):
     r = client.get("/api/health")
     assert r.headers["X-Content-Type-Options"] == "nosniff"
