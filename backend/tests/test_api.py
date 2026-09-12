@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import time
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -45,8 +46,13 @@ def test_ffmpeg_probe(client):
 
 
 def test_root_ok(client):
-    assert client.get("/").json()["api"] == "/api"
-
+    _DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+    if (_DIST / "index.html").is_file():
+        r = client.get("/")
+        assert r.status_code == 200
+        assert "text/html" in r.headers["content-type"]
+    else:
+        assert client.get("/").json()["api"] == "/api"
 
 def test_csp_header_present(client):
     r = client.get("/api/health")

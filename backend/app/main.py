@@ -9,11 +9,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
@@ -26,6 +27,9 @@ from .services.ffmpeg_service import inject_path
 from .workers.janitor import janitor_loop
 
 logger = logging.getLogger("crypto_couples")
+
+_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+_INDEX = _DIST / "index.html"
 
 
 def _content_security_policy() -> str:
@@ -108,7 +112,9 @@ def create_app() -> FastAPI:
         app.include_router(router)
 
     @app.get("/", include_in_schema=False)
-    def root() -> dict:
+    def root() -> Response | dict:
+        if _INDEX.is_file():
+            return FileResponse(_INDEX)
         return {"app": "Crypto Couples", "api": "/api", "docs": "/api/docs"}
 
     @app.exception_handler(ApiError)
