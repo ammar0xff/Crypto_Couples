@@ -8,15 +8,20 @@ const MEDIA_ROUTE: Record<MediaType, string> = {
 };
 
 export function workflowPath(media: MediaType, kind: OperationKind): string {
-  return `/api/${MEDIA_ROUTE[media]}/${kind}`;
+  // App-relative AND leading-slash: callers (api.ts request()) join this
+  // against API_URL which already carries "/api" (and has no trailing slash),
+  // so the path must start with "/" but must NOT start with "/api" — the
+  // old "/api/..." here produced the /api/api double-prefix that only the
+  // SPA catch-all answered -> 405 Method Not Allowed on every split/reveal.
+  return `/${MEDIA_ROUTE[media]}/${kind}`;
 }
 
 export function downloadAllUrl(opId: string): string {
-  return `/api/operations/${opId}/download-all`;
+  return `/operations/${opId}/download-all`;
 }
 
 export function downloadFileUrl(opId: string, name: string): string {
-  return `/api/operations/${opId}/download?name=${encodeURIComponent(name)}`;
+  return `/operations/${opId}/download?name=${encodeURIComponent(name)}`;
 }
 
 export const TERMINAL_STATUSES: Set<OperationStatus> = new Set([
