@@ -33,10 +33,11 @@ _INDEX = _DIST / "index.html"
 
 
 def _content_security_policy() -> str:
-    """API responses carry a strict CSP.
+    """API responses carry a strict CSP (no scripts, styles, frames, workers).
 
-    The PWA document's own CSP is served by its static host and covers
-    connect-src *to* this API, so this only needs to constrain API responses.
+    PWA documents get their own SPA-capable policy via
+    _spa_content_security_policy() so the built app can actually run;
+    everything under /api stays locked down to the wire format.
     """
     if settings.app_env == "development":
         connect = "'self' ws://localhost:* ws://127.0.0.1:*"
@@ -51,10 +52,38 @@ def _content_security_policy() -> str:
     )
 
 
+def _spa_content_security_policy() -> str:
+    """CSP for the served PWA document.
+
+    The SPA is same-origin (served from frontend/dist through this app), so a
+    self-only policy is enough: its own scripts, styles, images, fonts, web
+    manifestrings fallback icons, and the registerSW service worker must all be
+    allowed to load and run.
+    """
+    return (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self'; "
+        "manifest-src 'self'; "
+        "worker-src 'self' blob:; "
+        "connect-src 'self' wss: ws:; "
+        "base-uri 'self'; "
+        "object-src 'none'; "
+        "form-action 'self'; "
+        "frame-ancestors 'none'"
+    )
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
         response = await call_next(request)
-        response.headers["Content-Security-Policy"] = _content_security_policy()
+        if response.headers.get("content-type", "").startswith("text/html"):
+            csp = _spa_content_security_policy()
+        else:
+            csp = _content_security_policy()
+        response.headers["Content-Security-Policy"] = csp
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
